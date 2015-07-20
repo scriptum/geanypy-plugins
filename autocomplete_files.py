@@ -57,8 +57,7 @@ class AutocompleteFilePlugin(geany.Plugin):
 
     def relpath(self, path, line):
         """
-        Complete relative path. It also completes include for C/C++ and import
-        for python.
+        Complete relative path. It also add some sugar for different languages.
         """
         paths = {}
         doc = geany.document.get_current()
@@ -82,6 +81,9 @@ class AutocompleteFilePlugin(geany.Plugin):
                 if "callback" in el:
                     callback = el["callback"]
                 lang = True
+        project_path = geany.project.Project().base_path
+        if not lang and project_path:
+            dirs.append(project_path)
         starts_with_quote = line[len(line)-len(path)-1] in ['"', '<', '\'']
         if len(path) < 3 and not lang and path[:2] != './':
             return
