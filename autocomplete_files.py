@@ -47,6 +47,10 @@ class AutocompleteFilePlugin(geany.Plugin):
             if re.match("\s*(?:import|from)", line):
                 dirs.append(self.python_dir)
                 lang_python = True
+        elif doc.file_type.name == "Spec":
+            if re.match("\s*(?:Source|Patch)", line):
+                dirs.append(os.path.join(docdir, "../SOURCES"))
+        # print doc.file_type.name
         starts_with_quote = line[len(line)-len(path)-1] in ['"', '<', '\'']
         if len(path) < 3 and not (starts_with_quote or lang_c or lang_python):
             return paths
@@ -58,7 +62,6 @@ class AutocompleteFilePlugin(geany.Plugin):
                 pos -= 1
             # print d, paths
             for i in glob.iglob(p + '*'):
-                # print i[pos:]
                 if lang_python:
                     paths[os.path.splitext(i[pos:])[0]] = True
                 elif lang_c:
