@@ -83,7 +83,7 @@ class AutocompleteFilePlugin(geany.Plugin):
                     callback = el["callback"]
                 lang = True
         starts_with_quote = line[len(line)-len(path)-1] in ['"', '<', '\'']
-        if len(path) < 3 and not lang:
+        if len(path) < 3 and not lang and path[:2] != './':
             return
         for d in dirs:
             p = os.path.join(d, path)
