@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 
-import geany, os, re, glob
+import geany
+from glob import iglob, glob
+import os
+import re
+
 from gettext import gettext as _
 
 gsc = geany.scintilla
@@ -10,6 +14,15 @@ gsc.AUTOCSHOW = 2100
 gsc.AUTOCCANCEL = 2101
 gsc.AUTOCACTIVE = 2102
 
+def simple_callback(f):
+    return f
+
+def cpp_callback(f):
+    return f if os.path.splitext(f)[1] in ('.h', '') else None
+
+# TODO: cross-platform?
+INCLUDE="/usr/include"
+
 class AutocompleteFilePlugin(geany.Plugin):
 
     __plugin_name__ = _("Autocomplete file names")
@@ -17,9 +30,30 @@ class AutocompleteFilePlugin(geany.Plugin):
     __plugin_version__ = "0.1"
     __plugin_author__ = "Pavel Roschin <rpg89(at)post(dot)ru>"
 
-    python_dir = None
-    c_include_dir = "/usr/include:/usr/include/*/"
-    cpp_include_dir = "/usr/include/c++/*:/usr/include/c++/*/*/"
+    word_regexp = re.compile("[^\s'\"<>()\[\],!=*]+$")
+    completions_limit = 30
+
+    lang_rules = {
+        "C": {
+            "dir": INCLUDE+":"+INCLUDE+"/*/",
+            "regexp": "\s*#\s*include",
+            "callback": cpp_callback
+        },
+        "C++": {
+            "dir": INCLUDE+":"+INCLUDE+"/*/:"+INCLUDE+"/c++/*:"+INCLUDE+"/c++/*/*/",
+            "regexp": "\s*#\s*include",
+            "callback": cpp_callback
+        },
+        "Spec": {
+            "dir": "../SOURCES",
+            "regexp": "\s*(?:Source|Patch)"
+        },
+        "Python": {
+            "dir": os.path.dirname(os.__file__),
+            "regexp": "\s*(?:import|from) ",
+            "callback": lambda f: os.path.splitext(f)[0]
+        }
+    }
 
     def relpath(self, path, line):
         """
@@ -34,56 +68,40 @@ class AutocompleteFilePlugin(geany.Plugin):
         else:
             docdir = os.path.dirname(docpath)
         dirs = [docdir]
-        lang_python = False
-        lang_c = False
-        # print "!!!"
-        if doc.file_type.name in ("C", "C++"):
-            if re.match("\s*#\s*include", line):
-                if doc.file_type.name == "C++":
-                    dirs += self.cpp_include_dirs
-                dirs += self.c_include_dirs
-                lang_c = True
-        elif doc.file_type.name == "Python":
-            if re.match("\s*(?:import|from)", line):
-                dirs.append(self.python_dir)
-                lang_python = True
-        elif doc.file_type.name == "Spec":
-            if re.match("\s*(?:Source|Patch)", line):
-                dirs.append(os.path.join(docdir, "../SOURCES"))
-        # print doc.file_type.name
+        lang = False
+        callback = simple_callback
+        # rules based on languages and regexps
+        if doc.file_type.name in self.lang_rules:
+            el = self.lang_rules[doc.file_type.name]
+            if el["regexp"].search(line):
+                for d in el["dirs"]:
+                    if os.path.isabs(d):
+                        dirs.append(d)
+                    else:
+                        dirs.append(os.path.join(docdir, d))
+                if "callback" in el:
+                    callback = el["callback"]
+                lang = True
         starts_with_quote = line[len(line)-len(path)-1] in ['"', '<', '\'']
-        if len(path) < 3 and not (starts_with_quote or lang_c or lang_python):
-            return paths
+        if len(path) < 3 and not lang:
+            return
         for d in dirs:
-            if len(paths) > 10: break
             p = os.path.join(d, path)
             pos = len(d) + 1
             if d[-1:] == os.path.sep:
                 pos -= 1
-            # print d, paths
-            for i in glob.iglob(p + '*'):
-                if lang_python:
-                    paths[os.path.splitext(i[pos:])[0]] = True
-                elif lang_c:
-                    f = i[pos:]
-                    if os.path.splitext(f)[1] in ('.h', ''):
-                        paths[f] = True
-                else:
-                    paths[i[pos:]] = True
-                if len(paths) > 10: break
-        return paths
+            for i in iglob(p + '*'):
+                f = callback(i[pos:])
+                if f:
+                    yield f
 
     def abspath(self, path):
         """
         Complete absolute path (Linux only).
         """
-        paths = {}
-        if len(path) == 1: return paths # skip trivial "/"
-        if path[1] == '/': return paths # // is a comment
-        for i in glob.iglob(path + '*'):
-            paths[i] = True
-            if len(paths) > 10: break
-        return paths
+        if len(path) == 1: return # skip trivial "/"
+        if path[1] == '/': return # // is a comment
+        return iglob(path + '*')
 
     def get_current_line(self, sci):
         """
@@ -96,29 +114,32 @@ class AutocompleteFilePlugin(geany.Plugin):
             return None
         return sci.get_contents_range(start, end)
 
-    def editor_cb(self, obj, editor, nt):
-        if nt.nmhdr.code != gsc.CHAR_ADDED:
+    def editor_cb(self, obj, editor, notification):
+        """
+        Callback for every character added to editor
+        """
+        if notification.nmhdr.code != gsc.CHAR_ADDED:
             return False
         sci = editor.scintilla
         line = self.get_current_line(sci)
         if not line: return False
-        match = re.search('[^\s\'"<>()\[\],!=]+$', line)
+        match = self.word_regexp.search(line)
         if not match: return False
         path = match.group(0)
-        paths = self.abspath(path) if path[0] == '/' else self.relpath(path, line)
-        if len(paths) == 0:
-            return False
+        it = self.abspath(path) if path[0] == '/' else self.relpath(path, line)
+        paths = {}
+        for i in it:
+            paths[i] = True
+            if len(paths) > self.completions_limit: break
+        if len(paths) == 0: return False
         sci.send_text_message(gsc.AUTOCSHOW, len(path), '\n'.join(paths.keys()))
-
-    def parse_includes(self, paths):
-        res = []
-        for d in paths.split(':'):
-            res += glob.glob(d)
-        return res
 
     def __init__(self):
         geany.Plugin.__init__(self)
         geany.signals.connect("editor-notify", self.editor_cb)
-        self.python_dir = os.path.dirname(os.__file__)
-        self.c_include_dirs = self.parse_includes(self.c_include_dir)
-        self.cpp_include_dirs = self.parse_includes(self.cpp_include_dir)
+        for lang in self.lang_rules:
+            el = self.lang_rules[lang]
+            el["dirs"] = []
+            for d in el["dir"].split(':'):
+                el["dirs"] += glob(d)
+            el["regexp"] = re.compile(el["regexp"])
