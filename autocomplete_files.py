@@ -52,6 +52,10 @@ class AutocompleteFilePlugin(geany.Plugin):
             "dir": os.path.dirname(os.__file__),
             "regexp": "\s*(?:import|from) ",
             "callback": lambda f: os.path.splitext(f)[0]
+        },
+        "Sh": {
+            "dir": ".",
+            "regexp": "\s*(?:[.]|source) "
         }
     }
 
@@ -70,6 +74,7 @@ class AutocompleteFilePlugin(geany.Plugin):
         lang = False
         callback = simple_callback
         # rules based on languages and regexps
+        # print doc.file_type.name 
         if doc.file_type.name in self.lang_rules:
             el = self.lang_rules[doc.file_type.name]
             if el["regexp"].search(line):
@@ -129,6 +134,7 @@ class AutocompleteFilePlugin(geany.Plugin):
         if not match: return False
         path = match.group(0)
         it = self.abspath(path) if path[0] == '/' else self.relpath(path, line)
+        if not it: return False
         paths = {}
         for i in it:
             paths[i] = True
@@ -143,5 +149,6 @@ class AutocompleteFilePlugin(geany.Plugin):
             el = self.lang_rules[lang]
             el["dirs"] = []
             for d in el["dir"].split(':'):
-                el["dirs"] += glob(d)
+                dirs = glob(d)
+                el["dirs"] += dirs if len(dirs) > 0 else [d]
             el["regexp"] = re.compile(el["regexp"])
