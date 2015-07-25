@@ -54,7 +54,7 @@ class AutocompleteFilePlugin(geany.Plugin):
             "callback": lambda f: os.path.splitext(f)[0]
         },
         "Sh": {
-            "dir": ".",
+            "dir": "/bin:/usr/bin:.",
             "regexp": "\s*(?:[.]|source) "
         }
     }
