@@ -30,32 +30,32 @@ class AutocompleteFilePlugin(geany.Plugin):
     __plugin_version__ = "0.1"
     __plugin_author__ = "Pavel Roschin <rpg89(at)post(dot)ru>"
 
-    word_regexp = re.compile("[^\s'\"<>()\[\],!=*]+$")
+    word_regexp = re.compile("[^\s'\"<>()\[\],!=*`]+$")
     completions_limit = 30
 
     lang_rules = {
         "C": {
             "dir": INCLUDE+":"+INCLUDE+"/*/",
-            "regexp": "\s*#\s*include",
+            "regexp": "^\s*#\s*include",
             "callback": cpp_callback
         },
         "C++": {
             "dir": INCLUDE+":"+INCLUDE+"/*/:"+INCLUDE+"/c++/*:"+INCLUDE+"/c++/*/*/",
-            "regexp": "\s*#\s*include",
+            "regexp": "^\s*#\s*include",
             "callback": cpp_callback
         },
         "Spec": {
             "dir": "../SOURCES",
-            "regexp": "\s*(?:Source|Patch)"
+            "regexp": "^\s*(?:Source|Patch)"
         },
         "Python": {
             "dir": os.path.dirname(os.__file__),
-            "regexp": "\s*(?:import|from) ",
+            "regexp": "^\s*(?:import|from) ",
             "callback": lambda f: os.path.splitext(f)[0]
         },
         "Sh": {
             "dir": "/bin:/usr/bin:.",
-            "regexp": "\s*(?:[.]|source) "
+            "regexp": "^\s*(?:[.] |source |.*\$\(|.*`|\w+)\s*$"
         }
     }
 
@@ -77,6 +77,7 @@ class AutocompleteFilePlugin(geany.Plugin):
         # print doc.file_type.name 
         if doc.file_type.name in self.lang_rules:
             el = self.lang_rules[doc.file_type.name]
+            # print "'"+line+"'", "'"+path+"'", el["regexp"].pattern
             if el["regexp"].search(line):
                 for d in el["dirs"]:
                     if os.path.isabs(d):
@@ -140,7 +141,7 @@ class AutocompleteFilePlugin(geany.Plugin):
             paths[i] = True
             if len(paths) > self.completions_limit: break
         if len(paths) == 0: return False
-        sci.send_text_message(gsc.AUTOCSHOW, len(path), '\n'.join(paths.keys()))
+        sci.send_text_message(gsc.AUTOCSHOW, len(path), '\n'.join(sorted(paths.keys())))
 
     def __init__(self):
         geany.Plugin.__init__(self)
