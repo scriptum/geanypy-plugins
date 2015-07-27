@@ -79,7 +79,6 @@ class AutocompleteFilePlugin(geany.Plugin):
         # print doc.file_type.name 
         if doc.file_type.name in self.lang_rules:
             el = self.lang_rules[doc.file_type.name]
-            # print "'"+line+"'", "'"+path+"'", el["regexp"].pattern
             if el["regexp"].search(line):
                 for d in el["dirs"]:
                     if os.path.isabs(d):
@@ -146,7 +145,6 @@ class AutocompleteFilePlugin(geany.Plugin):
         match = self.word_regexp.search(line)
         if not match: return False
         path = match.group(0)
-        print path
         if len(path) > 0 and path[0] == '/':
             it = self.abspath(path)
         elif len(path) > 0 and  path[0] == '~':
