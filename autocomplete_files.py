@@ -21,7 +21,8 @@ def cpp_callback(f):
     return f if os.path.splitext(f)[1] in ('.h', '') else None
 
 # TODO: cross-platform?
-INCLUDE="/usr/include"
+INCLUDE = "/usr/include"
+PYTHONDIR = os.path.dirname(os.__file__)
 
 class AutocompleteFilePlugin(geany.Plugin):
 
@@ -30,7 +31,8 @@ class AutocompleteFilePlugin(geany.Plugin):
     __plugin_version__ = "0.1"
     __plugin_author__ = "Pavel Roschin <rpg89(at)post(dot)ru>"
 
-    word_regexp = re.compile("[^\s'\"<>()\[\],!=*`]+$")
+    word = "[^\s'\"<>()\[\],!=*`]*$"
+    word_regexp = re.compile(word)
     completions_limit = 30
 
     lang_rules = {
@@ -49,13 +51,13 @@ class AutocompleteFilePlugin(geany.Plugin):
             "regexp": "^\s*(?:Source|Patch)"
         },
         "Python": {
-            "dir": os.path.dirname(os.__file__),
-            "regexp": "^\s*(?:import|from) ",
+            "dir": PYTHONDIR+":"+os.path.join(PYTHONDIR, "lib-dynload"),
+            "regexp": "^\s*(?:import|from) " + word,
             "callback": lambda f: os.path.splitext(f)[0]
         },
         "Sh": {
             "dir": "/bin:/usr/bin:.",
-            "regexp": "^\s*(?:[.] |source |.*\$\(|.*`|\w+)\s*$"
+            "regexp": "^\s*(?:[.] |source |.*\$\(|.*`|\w+|.*\| ?)" + word
         }
     }
 
@@ -111,6 +113,16 @@ class AutocompleteFilePlugin(geany.Plugin):
         if path[1] == '/': return # // is a comment
         return iglob(path + '*')
 
+    def homepath(self, path):
+        """
+        Complete user home (Linux only).
+        """
+        oldlen = len(path)
+        path = os.path.expanduser(path)
+        skip = len(path) - oldlen + 1
+        for i in iglob(path + '*'):
+            yield '~' + i[skip:]
+
     def get_current_line(self, sci):
         """
         Get current line (string). If position is more than 100, return None.
@@ -134,7 +146,13 @@ class AutocompleteFilePlugin(geany.Plugin):
         match = self.word_regexp.search(line)
         if not match: return False
         path = match.group(0)
-        it = self.abspath(path) if path[0] == '/' else self.relpath(path, line)
+        print path
+        if len(path) > 0 and path[0] == '/':
+            it = self.abspath(path)
+        elif len(path) > 0 and  path[0] == '~':
+            it = self.homepath(path)
+        else:
+            it = self.relpath(path, line)
         if not it: return False
         paths = {}
         for i in it:
