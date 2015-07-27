@@ -136,7 +136,7 @@ class AutocompleteFilePlugin(geany.Plugin):
 
     def editor_cb(self, obj, editor, notification):
         """
-        Callback for every character added to editor
+        Callback for every character added to editor.
         """
         if notification.nmhdr.code != gsc.CHAR_ADDED:
             return False
