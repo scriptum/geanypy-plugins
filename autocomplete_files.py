@@ -37,18 +37,21 @@ class AutocompleteFilePlugin(geany.Plugin):
 
     lang_rules = {
         "C": {
-            "dir": INCLUDE+":"+INCLUDE+"/*/",
-            "regexp": "^\s*#\s*include",
+            "dir": INCLUDE + ":" + INCLUDE + "/*/",
+            "regexp": "^\s*#\s*include\s*[<\"]" + word,
             "callback": cpp_callback
         },
         "C++": {
-            "dir": INCLUDE+":"+INCLUDE+"/*/:"+INCLUDE+"/c++/*:"+INCLUDE+"/c++/*/*/",
-            "regexp": "^\s*#\s*include",
+            "dir": ":".join([INCLUDE,
+                            INCLUDE + "/*/",
+                            INCLUDE + "/c++/*",
+                            INCLUDE + "/c++/*/*/"]),
+            "regexp": "^\s*#\s*include\s*[<\"]" + word,
             "callback": cpp_callback
         },
         "Spec": {
             "dir": "../SOURCES",
-            "regexp": "^\s*(?:Source|Patch)"
+            "regexp": "^\s*(?:Source|Patch).*:"
         },
         "Python": {
             "dir": PYTHONDIR+":"+os.path.join(PYTHONDIR, "lib-dynload"),
